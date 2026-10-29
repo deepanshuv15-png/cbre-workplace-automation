@@ -1,0 +1,45 @@
+# .github/workflows/regression.yml
+name: Workplace Automation Regression
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch: # lets you click "Run workflow" manually in GitHub
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright tests
+        env:
+          # Demo app runs inside the job, so these are synthetic demo values.
+          # For a real staging system, use ${{ secrets.BASE_URL }} etc. instead.
+          BASE_URL: http://localhost:3000
+          TEST_USERNAME: ${{ secrets.TEST_USERNAME || 'facilities.user' }}
+          TEST_PASSWORD: ${{ secrets.TEST_PASSWORD || 'Password123' }}
+        run: npx playwright test
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14

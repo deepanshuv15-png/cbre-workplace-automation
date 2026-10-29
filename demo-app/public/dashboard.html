@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Dashboard - Workplace Helpdesk (Demo)</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <h1>Workplace Helpdesk (Demo)</h1>
+    <form method="post" action="/logout"><span id="who"></span> <button type="submit" class="secondary" style="margin: 0 0 0 8px">Sign out</button></form>
+  </header>
+  <main>
+    <h2>Workplace Dashboard</h2>
+    <button id="create-btn" type="button">Create ticket</button>
+
+    <form id="ticket-form" class="hidden" novalidate>
+      <label for="category">Category</label>
+      <select id="category" name="category"><option value="">-- choose --</option></select>
+      <label for="site">Site</label>
+      <select id="site" name="site"><option value="">-- choose --</option></select>
+      <label for="description">Description</label>
+      <textarea id="description" name="description" rows="3"></textarea>
+      <button type="submit" id="submit-btn">Submit</button>
+    </form>
+
+    <div id="message" class="alert hidden" role="status"></div>
+
+    <h3>Tickets</h3>
+    <table aria-label="Tickets">
+      <thead><tr><th>ID</th><th>Category</th><th>Site</th><th>Status</th><th>Assigned team</th></tr></thead>
+      <tbody id="tickets"></tbody>
+    </table>
+  </main>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const form = $('ticket-form');
+    const msg = $('message');
+
+    function show(text, kind) {
+      msg.innerHTML = text;
+      msg.className = 'alert ' + kind;
+    }
+
+    async function loadReference() {
+      const ref = await (await fetch('/api/reference')).json();
+      ref.categories.forEach((c) => $('category').add(new Option(c, c)));
+      ref.sites.forEach((s) => $('site').add(new Option(s, s)));
+    }
+
+    async function loadTickets() {
+      const list = await (await fetch('/api/tickets')).json();
+      $('tickets').innerHTML = list.map((t) =>
+        `<tr><td><a href="/tickets/${t.id}">${t.id}</a></td><td>${t.category}</td><td>${t.site}</td><td>${t.status}</td><td>${t.assignedTeam}</td></tr>`
+      ).join('');
+    }
+
+    $('create-btn').addEventListener('click', () => {
+      form.classList.remove('hidden');
+      msg.className = 'alert hidden';
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = $('submit-btn');
+      btn.disabled = true; // stops double-click duplicates
+      const body = {
+        category: $('category').value,
+        site: $('site').value,
+        description: $('description').value,
+        requestId: crypto.randomUUID(),
+      };
+      const res = await fetch('/api/tickets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      btn.disabled = false;
+      if (res.ok) {
+        show(`Ticket created successfully. Ticket ID: <strong data-testid="ticket-id">${data.id}</strong> &middot; Status: <span data-testid="ticket-status">${data.status}</span> &middot; Assigned to: <span data-testid="ticket-team">${data.assignedTeam}</span>`, 'success');
+        form.reset();
+        form.classList.add('hidden');
+        loadTickets();
+      } else {
+        show(data.errors.join('<br>'), 'error');
+      }
+    });
+
+    fetch('/api/me').then((r) => r.json()).then((u) => ($('who').textContent = u.name));
+    loadReference();
+    loadTickets();
+  </script>
+</body>
+</html>

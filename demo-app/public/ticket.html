@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Ticket - Workplace Helpdesk (Demo)</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header><h1>Workplace Helpdesk (Demo)</h1><a href="/dashboard" style="color: #fff">Back to dashboard</a></header>
+  <main>
+    <h2 id="title">Ticket</h2>
+    <dl>
+      <dt>Status</dt><dd data-testid="status"></dd>
+      <dt>Category</dt><dd data-testid="category"></dd>
+      <dt>Site</dt><dd data-testid="site"></dd>
+      <dt>Assigned team</dt><dd data-testid="team"></dd>
+      <dt>Description</dt><dd data-testid="description"></dd>
+    </dl>
+
+    <label for="comment">Comment</label>
+    <textarea id="comment" rows="2"></textarea>
+    <button id="add-comment" type="button">Add comment</button>
+    <button id="close-ticket" type="button" class="secondary">Close ticket</button>
+
+    <div id="message" class="alert hidden" role="status"></div>
+
+    <h3>History</h3>
+    <ul id="history" aria-label="History"></ul>
+  </main>
+  <script>
+    const id = location.pathname.split('/').pop();
+    const $ = (x) => document.getElementById(x);
+    const q = (x) => document.querySelector(`[data-testid="${x}"]`);
+
+    function show(text, kind) { $('message').textContent = text; $('message').className = 'alert ' + kind; }
+
+    function render(t) {
+      $('title').textContent = `Ticket ${t.id}`;
+      q('status').textContent = t.status;
+      q('category').textContent = t.category;
+      q('site').textContent = t.site;
+      q('team').textContent = t.assignedTeam;
+      q('description').textContent = t.description;
+      $('history').innerHTML = t.history.map((h) => `<li>${h.text} <small>(${h.by})</small></li>`).join('');
+    }
+
+    async function load() {
+      const res = await fetch(`/api/tickets/${id}`);
+      if (!res.ok) return show('Ticket not found', 'error');
+      render(await res.json());
+    }
+
+    $('add-comment').addEventListener('click', async () => {
+      const res = await fetch(`/api/tickets/${id}/comments`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: $('comment').value }),
+      });
+      const data = await res.json();
+      if (res.ok) { $('comment').value = ''; render(data); show('Comment added', 'success'); }
+      else show(data.error || data.errors.join(', '), 'error');
+    });
+
+    $('close-ticket').addEventListener('click', async () => {
+      const res = await fetch(`/api/tickets/${id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'Closed' }),
+      });
+      const data = await res.json();
+      if (res.ok) { render(data); show('Ticket closed', 'success'); }
+      else show(data.error, 'error');
+    });
+
+    load();
+  </script>
+</body>
+</html>
